@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Mapy.cz Panorama API</title>
+    <script type="text/javascript" src="https://api.mapy.cz/js/panorama/v1/panorama.js"></script>
+</head>
+<body>
+    <h1>Test Mapy.cz Panorama API</h1>
+    <div id="results"></div>
+    <button onclick="testPanorama()">Test Panorama Exists</button>
+    
+    <script>
+        // Your actual API key
+        const API_KEY = 'iubKNvi3PYUniMCsLKn2Yb65Pw1FS5C_DF2-bEd2ZWc';
+        
+        async function testPanorama() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.innerHTML = '<p>Testing API...</p>';
+            
+            console.log('Testing Panorama API...');
+            console.log('Window.Panorama:', window.Panorama);
+            
+            if (!window.Panorama) {
+                resultsDiv.innerHTML = '<p style="color: red;">ERROR: Panorama API not loaded!</p>';
+                return;
+            }
+            
+            console.log('Available methods:', Object.keys(window.Panorama));
+            
+            if (!window.Panorama.panoramaExists) {
+                resultsDiv.innerHTML = '<p style="color: red;">ERROR: panoramaExists method not found!</p>';
+                return;
+            }
+            
+            // Test locations in Prague where panoramas should exist
+            const testLocations = [
+                { lon: 14.4378, lat: 50.0755, name: "Praha - Staroměstské náměstí" },
+                { lon: 14.4206, lat: 50.0874, name: "Praha - Hradčany" },
+                { lon: 14.4656, lat: 50.0755, name: "Praha - Náměstí Míru" }
+            ];
+            
+            resultsDiv.innerHTML = '<h3>Testing locations:</h3>';
+            
+            for (const location of testLocations) {
+                try {
+                    console.log(`Testing ${location.name} at [${location.lat}, ${location.lon}]`);
+                    
+                    const result = await window.Panorama.panoramaExists({
+                        lon: location.lon,
+                        lat: location.lat,
+                        apiKey: API_KEY,
+                        radius: 100
+                    });
+                    
+                    console.log(`Result for ${location.name}:`, result);
+                    
+                    const div = document.createElement('div');
+                    div.style.margin = '10px 0';
+                    div.style.padding = '10px';
+                    div.style.border = '1px solid #ccc';
+                    
+                    // Zkontrolujeme podle oficiální dokumentace
+                    if (result && result.exists && result.info) {
+                        div.style.backgroundColor = '#d4edda';
+                        div.innerHTML = `
+                            <strong>${location.name}</strong><br>
+                            ✅ Panorama FOUND! (exists: ${result.exists})<br>
+                            Position: [${result.info.lat}, ${result.info.lon}]<br>
+                            Date: ${result.info.date}
+                        `;
+                    } else {
+                        div.style.backgroundColor = '#f8d7da';
+                        div.innerHTML = `
+                            <strong>${location.name}</strong><br>
+                            ❌ No panorama found<br>
+                            Exists: ${result?.exists || false}<br>
+                            Has info: ${result?.info ? 'yes' : 'no'}
+                        `;
+                    }
+                    
+                    resultsDiv.appendChild(div);
+                    
+                    // Delay between requests
+                    await new Promise(resolve => setTimeout(resolve, 200));
+                    
+                } catch (error) {
+                    console.error(`Error testing ${location.name}:`, error);
+                    
+                    const div = document.createElement('div');
+                    div.style.margin = '10px 0';
+                    div.style.padding = '10px';
+                    div.style.border = '1px solid #ccc';
+                    div.style.backgroundColor = '#f8d7da';
+                    div.innerHTML = `
+                        <strong>${location.name}</strong><br>
+                        ❌ ERROR: ${error.message || error}
+                    `;
+                    resultsDiv.appendChild(div);
+                }
+            }
+        }
+        
+        // Auto-test when page loads
+        window.addEventListener('load', () => {
+            setTimeout(() => {
+                console.log('Auto-testing panorama API...');
+                testPanorama();
+            }, 1000);
+        });
+    </script>
+</body>
+</html>
