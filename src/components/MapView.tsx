@@ -1661,6 +1661,14 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
     const panoSource = panoramaLayer.getSource();
     if (!panoSource) return;
 
+    // Smažeme předchozí body a resetujeme stav
+    console.log('🔄 Čistím předchozí body panorama před načtením nových...');
+    panoSource.clear();
+    seen.clear();
+    setPanoramaLocations([]);
+    setPanoramaWithDates([]);
+
+
     // If a polygon exists, restrict loading to polygon area with 15m grid
     const polygons = vectorSourceRef.current?.getFeatures() || [];
     const polygonGeom = polygons.find(f => f.getGeometry()?.getType() === 'Polygon')?.getGeometry() as Polygon | undefined;
