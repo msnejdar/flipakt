@@ -1047,12 +1047,18 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
               info: panoramaResult.info
             });
 
-            // 🚀 Quick AI analysis
-            const analysis = await analyzePropertyCondition(`panorama-${foundCount}`, [panoramaResult.info.lon, panoramaResult.info.lat]);
-
-            // Add to map
+            // 🚀 NO AWAIT - create feature immediately without AI analysis
             const originalCoords = [panoramaResult.info.lon, panoramaResult.info.lat];
             const projectedCoords = fromLonLat(originalCoords);
+
+            // Create mock analysis for instant rendering
+            const mockAnalysis = {
+              condition: 'pending',
+              confidence: 0,
+              issues: ['Analysis pending...'],
+              recommendation: 'AI analysis will run in background',
+              estimatedValue: 0
+            };
 
             const panoramaFeature = new Feature({
               geometry: new Point(projectedCoords),
@@ -1060,23 +1066,23 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
               coordinates: originalCoords,
               date: panoramaResult.info.date || '2024-01-01 12:00:00',
               type: 'real-panorama',
-              analysis,
+              analysis: mockAnalysis,
               panoramaInfo: panoramaResult.info
             });
 
             // 🚀 Collect feature for batch add (no progressive rendering!)
             allFeatures.push(panoramaFeature);
-            
+
             // Přidej do výsledků
             newResults.push({
               id: foundCount,
               name: `Panorama ${foundCount}`,
               coordinates: [panoramaResult.info.lon, panoramaResult.info.lat],
-              condition: (analysis as any).condition,
-              confidence: (analysis as any).confidence,
-              issues: (analysis as any).issues,
-              recommendation: (analysis as any).recommendation,
-              estimatedValue: (analysis as any).estimatedValue,
+              condition: mockAnalysis.condition,
+              confidence: mockAnalysis.confidence,
+              issues: mockAnalysis.issues,
+              recommendation: mockAnalysis.recommendation,
+              estimatedValue: mockAnalysis.estimatedValue,
               panoramaDate: panoramaResult.info.date
             });
 
