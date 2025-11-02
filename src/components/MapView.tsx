@@ -978,19 +978,35 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
       
       // Test each point in the comprehensive grid for panorama existence
       console.log(`🔍 Starting comprehensive panorama search with ${gridPoints.length} test points...`);
-      
-      for (let i = 0; i < gridPoints.length; i++) {
-        const point = gridPoints[i];
-        
-        // Progress update every 10 points to avoid console spam
-        if (i % 10 === 0) {
-          console.log(`🔍 Testing point ${i + 1}/${gridPoints.length}: [${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}]`);
-        }
-        
-        try {
-          // Use small radius (25m) to find the closest panorama on the street
-          const searchRadius = 25;
-          const panoramaResult = await checkPanoramaExists(point.lon, point.lat, API_KEY, searchRadius);
+
+      // 🚀 PERFORMANCE OPTIMIZATION: Parallel batch processing instead of sequential
+      const BATCH_SIZE = 20; // Process 20 points in parallel for faster results
+      const searchRadius = 25;
+
+      for (let batchStart = 0; batchStart < gridPoints.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, gridPoints.length);
+        const batch = gridPoints.slice(batchStart, batchEnd);
+
+        console.log(`🔍 Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(gridPoints.length / BATCH_SIZE)} (points ${batchStart + 1}-${batchEnd})`);
+
+        // Process all points in batch in parallel
+        const batchResults = await Promise.allSettled(
+          batch.map((point, idx) =>
+            checkPanoramaExists(point.lon, point.lat, API_KEY, searchRadius)
+              .then(result => ({ point, result, index: batchStart + idx }))
+          )
+        );
+
+        // Process results from the batch
+        for (const promiseResult of batchResults) {
+          if (promiseResult.status === 'rejected') {
+            console.warn('⚠️ Panorama check failed:', promiseResult.reason);
+            continue;
+          }
+
+          const { point, result: panoramaResult, index: i } = promiseResult.value;
+
+          try {
           
           // 🔍 ENHANCED API RESPONSE VALIDATION
           console.log(`📦 Validating API response for point ${i + 1}:`);
@@ -1137,38 +1153,18 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
             }]);
             
           } else {
-            console.log(`❌ No panorama found at [${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}]`);
+            console.log(`❌ No panorama found at point ${i + 1}`);
           }
         } catch (error) {
-          console.error(`🔥 ERROR checking panorama at [${point.lat.toFixed(6)}, ${point.lon.toFixed(6)}]:`);
-          console.error(`🔥 Error type: ${error instanceof Error ? error.name : typeof error}`);
-          console.error(`🔥 Error message: ${error instanceof Error ? error.message : String(error)}`);
-          console.error(`🔥 Error stack:`, error instanceof Error ? error.stack : 'No stack trace');
-          
-          // Try to determine error type
-          if (error instanceof TypeError) {
-            console.error(`🔥 Type Error - possibly coordinate or API issue`);
-          } else if (error instanceof ReferenceError) {
-            console.error(`🔥 Reference Error - possibly missing variable`);
-          } else if (error && typeof error === 'object' && 'code' in error) {
-            console.error(`🔥 Error code: ${(error as any).code}`);
-          }
-          
+          console.error(`🔥 ERROR checking panorama at point ${i + 1}:`, error);
           // Continue with next point rather than failing completely
-          continue;
         }
-        
-        // Enhanced progress update with panorama count
-        const progress = 30 + Math.round(((i + 1) / gridPoints.length) * 60);
+      }
+
+        // Enhanced progress update with panorama count after each batch
+        const progress = 30 + Math.round((batchEnd / gridPoints.length) * 60);
         setAnalysisProgress(progress);
-        
-        // Show real-time progress every 20 points
-        if (i % 20 === 0) {
-          console.log(`📊 Progress: ${progress}% - Tested ${i + 1}/${gridPoints.length} points, Found ${foundCount} panoramas`);
-        }
-        
-        // Rate limiting - pause between requests to avoid API overload
-        await rateLimiter();
+        console.log(`📊 Progress: ${progress}% (${foundCount} panoramas found so far)`);
       }
       
       // Set all results at once
