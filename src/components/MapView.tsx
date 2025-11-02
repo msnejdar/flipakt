@@ -1756,6 +1756,8 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
     seen.clear();
     setPanoramaLocations([]);
     setPanoramaWithDates([]);
+    setAnalysisResults([]);
+    setSelectedForAnalysis(new Set());
 
 
     // If a polygon exists, restrict loading to polygon area with 15m grid
@@ -1809,6 +1811,9 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
 
     let foundCount = 0;
     const newFeatures: Feature[] = [];
+    const newResults: any[] = [];
+    const newPanoramaLocations: {lon: number, lat: number}[] = [];
+    const newPanoramaWithDates: {lon: number, lat: number, date: string}[] = [];
 
     results.forEach(promiseResult => {
       if (promiseResult.status === 'fulfilled' && promiseResult.value) {
@@ -1822,13 +1827,32 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
           
           const feature = new Feature({
             geometry: new Point(fromLonLat([panoramaResult.info.lon, panoramaResult.info.lat])),
-            name: `Panorama Point ${foundCount}`,
+            name: `Panorama ${foundCount}`,
             coordinates: [panoramaResult.info.lon, panoramaResult.info.lat],
             date: panoramaResult.info.date || 'Unknown',
             type: 'view-panorama',
             panoramaInfo: panoramaResult.info
           });
           newFeatures.push(feature);
+
+          newResults.push({
+            id: foundCount,
+            name: `Panorama ${foundCount}`,
+            coordinates: [panoramaResult.info.lon, panoramaResult.info.lat],
+            condition: 'pending',
+            confidence: 0,
+            issues: ['Čeká na AI analýzu'],
+            recommendation: 'Spusťte AI analýzu pro doporučení.',
+            estimatedValue: 0,
+            panoramaDate: panoramaResult.info.date
+          });
+
+          newPanoramaLocations.push({ lon: panoramaResult.info.lon, lat: panoramaResult.info.lat });
+          newPanoramaWithDates.push({
+            lon: panoramaResult.info.lon,
+            lat: panoramaResult.info.lat,
+            date: panoramaResult.info.date
+          });
         }
       }
     });
@@ -1836,6 +1860,10 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
     if (newFeatures.length > 0) {
       panoSource.addFeatures(newFeatures); // Batch add all features
     }
+
+    setPanoramaLocations(newPanoramaLocations);
+    setPanoramaWithDates(newPanoramaWithDates);
+    setAnalysisResults(newResults);
     
     console.log(`✅ Loaded ${foundCount} panorama points in current view`);
     
