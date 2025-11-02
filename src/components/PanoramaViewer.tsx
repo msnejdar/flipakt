@@ -84,22 +84,22 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({
     }
   }, [lon, lat, controls]);
 
-  // Debounced update effect
+  // Initial load
   useEffect(() => {
-    if (updateTimeoutRef.current) {
-      clearTimeout(updateTimeoutRef.current);
-    }
+    updateImage();
+  }, [lon, lat]); // Only re-trigger if the location fundamentally changes
 
-    updateTimeoutRef.current = setTimeout(() => {
+  // Debounced update effect for controls changes
+  useEffect(() => {
+    const handler = setTimeout(() => {
       updateImage();
-    }, 500); // 500ms delay to avoid excessive API calls
+    }, 300); // 300ms delay
 
     return () => {
-      if (updateTimeoutRef.current) {
-        clearTimeout(updateTimeoutRef.current);
-      }
+      clearTimeout(handler);
     };
-  }, [updateImage]);
+  }, [controls, updateImage]);
+
 
   // Control handlers
   const handleControlChange = (key: keyof PanoramaControlsState, value: number) => {
