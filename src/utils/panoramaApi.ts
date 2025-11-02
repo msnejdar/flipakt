@@ -22,7 +22,7 @@ export class PanoramaApiService {
       yaw: (options.yaw || 0).toString(),
       pitch: (options.pitch || 0).toString(),
       fov: (options.fov || 90).toString(),
-      apikey: this.apiKey
+      apiKey: this.apiKey
     });
 
     return `${this.baseUrl}?${params.toString()}`;
