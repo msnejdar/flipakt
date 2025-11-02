@@ -978,7 +978,10 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
       let foundCount = 0;
       const newResults: any[] = [];
       const foundPanoramas: {lon: number, lat: number, info?: any}[] = [];
-      
+      const allPanoramaLocations: {lon: number, lat: number}[] = [];
+      const allPanoramaWithDates: {lon: number, lat: number, date: string}[] = [];
+      const allFeatures: Feature[] = []; // 🚀 Collect all features for batch add
+
       console.log(`🎯 Testing ${gridPoints.length} comprehensive grid points for panoramas...`);
       
       // Test each point in the comprehensive grid for panorama existence
@@ -1061,7 +1064,8 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
               panoramaInfo: panoramaResult.info
             });
 
-            source.addFeature(panoramaFeature);
+            // 🚀 Collect feature for batch add (no progressive rendering!)
+            allFeatures.push(panoramaFeature);
             
             // Přidej do výsledků
             newResults.push({
@@ -1075,23 +1079,32 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
               estimatedValue: (analysis as any).estimatedValue,
               panoramaDate: panoramaResult.info.date
             });
-            
-            // Aktualizuj state
-            setPanoramaLocations(prev => [...prev, { lon: panoramaResult.info!.lon, lat: panoramaResult.info!.lat }]);
-            setPanoramaWithDates(prev => [...prev, {
-              lon: panoramaResult.info!.lon,
-              lat: panoramaResult.info!.lat,
-              date: panoramaResult.info!.date
-            }]);
+
+            // 🚀 Collect for batch state update at the end
+            allPanoramaLocations.push({ lon: panoramaResult.info.lon, lat: panoramaResult.info.lat });
+            allPanoramaWithDates.push({
+              lon: panoramaResult.info.lon,
+              lat: panoramaResult.info.lat,
+              date: panoramaResult.info.date
+            });
           }
         } catch (error) {
           // Continue with next point rather than failing completely
         }
       }
-      
-      // Set all results at once
+
+      // 🚀 INSTANT UPDATE: Add all features to map at once!
+      console.log(`🚀 Adding ${allFeatures.length} features to map instantly...`);
+      if (allFeatures.length > 0) {
+        source.addFeatures(allFeatures); // Batch add - single render!
+      }
+
+      // 🚀 INSTANT UPDATE: Set all state at once - no progressive rendering!
+      console.log(`🚀 Updating state with ${allPanoramaLocations.length} panoramas...`);
+      setPanoramaLocations(allPanoramaLocations);
+      setPanoramaWithDates(allPanoramaWithDates);
       setAnalysisResults(newResults);
-      
+
       // Show analysis panel if we have results
       if (newResults.length > 0) {
         setShowAnalysisPanel(true);
