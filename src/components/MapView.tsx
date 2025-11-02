@@ -15,7 +15,7 @@ import CircleStyle from 'ol/style/Circle.js';
 import Feature from 'ol/Feature.js';
 import { Point, Polygon } from 'ol/geom';
 import { toLonLat, fromLonLat } from 'ol/proj';
-import PanoramaApiService from './PanoramaApiService';
+import { PanoramaApiService } from '../utils/panoramaApi';
 
 // TypeScript deklarace pro Mapy.cz REST API odpověď
 
