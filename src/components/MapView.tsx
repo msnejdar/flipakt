@@ -118,26 +118,42 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
   };
 
   // Panorama existence check via JS Panorama SDK
+  // 🚀 OPTIMIZED: Cache for panorama checks to avoid duplicate API calls
+  const panoramaCache = useRef<Record<string, IPanoramaExistsOutput | null>>({});
+
   async function checkPanoramaExists(lon: number, lat: number, apiKey: string, radius: number = 150): Promise<IPanoramaExistsOutput | null> {
-    if (typeof lon !== 'number' || isNaN(lon) || typeof lat !== 'number' || isNaN(lat)) {
-      console.error('❌ Invalid coordinate inputs');
+    // Quick validation without logging
+    if (typeof lon !== 'number' || isNaN(lon) || typeof lat !== 'number' || isNaN(lat) || !apiKey) {
       return null;
     }
-    if (!apiKey || typeof apiKey !== 'string' || apiKey.length < 10) {
-      console.error('❌ Invalid API key');
-      return null;
+
+    // 🚀 Check cache first
+    const cacheKey = `${lon.toFixed(6)},${lat.toFixed(6)},${radius}`;
+    if (cacheKey in panoramaCache.current) {
+      return panoramaCache.current[cacheKey];
     }
 
     try {
       await ensurePanoramaSDK();
-      if (!(window as any).Panorama || !(window as any).Panorama.panoramaExists) {
-        console.error('❌ Panorama SDK not available after load');
+      if (!(window as any).Panorama?.panoramaExists) {
         return null;
       }
-      const output = await (window as any).Panorama.panoramaExists({ lon, lat, apiKey, radius });
-      return output as IPanoramaExistsOutput;
+
+      // 🚀 Add timeout to fail fast (500ms instead of waiting forever)
+      const timeoutPromise = new Promise<null>((_, reject) =>
+        setTimeout(() => reject(new Error('Timeout')), 500)
+      );
+
+      const apiPromise = (window as any).Panorama.panoramaExists({ lon, lat, apiKey, radius });
+
+      const output = await Promise.race([apiPromise, timeoutPromise]) as IPanoramaExistsOutput;
+
+      // 🚀 Cache the result
+      panoramaCache.current[cacheKey] = output;
+      return output;
     } catch (e) {
-      console.error('❌ panoramaExists call failed:', e);
+      // 🚀 Cache failed attempts too
+      panoramaCache.current[cacheKey] = null;
       return null;
     }
   }
@@ -205,21 +221,10 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
     }
   };
 
-  // Point-in-polygon test using ray casting algorithm - ENHANCED DEBUG VERSION
+  // 🚀 OPTIMIZED: Point-in-polygon test using ray casting algorithm
   const pointInPolygon = (point: [number, number], polygon: [number, number][]): boolean => {
     const [x, y] = point;
     let inside = false;
-    
-    // 🔍 DEBUG: Log the point being tested (first few times)
-    if (Math.random() < 0.1) { // Log 10% of tests to avoid spam
-      console.log(`🔶 Point-in-polygon test: [${y.toFixed(6)}, ${x.toFixed(6)}] (lat,lon)`);
-      console.log(`🔶 Polygon bounds: ${polygon.length} vertices`);
-      if (polygon.length > 0) {
-        const lons = polygon.map(p => p[0]);
-        const lats = polygon.map(p => p[1]);
-        console.log(`🔶 Polygon range: lon [${Math.min(...lons).toFixed(6)}, ${Math.max(...lons).toFixed(6)}], lat [${Math.min(...lats).toFixed(6)}, ${Math.max(...lats).toFixed(6)}]`);
-      }
-    }
     
     for (let i = 0, j = polygon.length - 1; i < polygon.length; j = i++) {
       const [xi, yi] = polygon[i];
@@ -980,7 +985,7 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
       console.log(`🔍 Starting comprehensive panorama search with ${gridPoints.length} test points...`);
 
       // 🚀 PERFORMANCE OPTIMIZATION: Parallel batch processing instead of sequential
-      const BATCH_SIZE = 20; // Process 20 points in parallel for faster results
+      const BATCH_SIZE = 50; // Process 50 points in parallel for maximum speed
       const searchRadius = 25;
 
       for (let batchStart = 0; batchStart < gridPoints.length; batchStart += BATCH_SIZE) {
@@ -1007,88 +1012,49 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
           const { point, result: panoramaResult, index: i } = promiseResult.value;
 
           try {
-          
-          // 🔍 ENHANCED API RESPONSE VALIDATION
-          console.log(`📦 Validating API response for point ${i + 1}:`);
-          console.log(`  📦 Result exists: ${!!panoramaResult}`);
-          
-          if (panoramaResult) {
-            console.log(`  📦 Result.exists: ${panoramaResult.exists} (type: ${typeof panoramaResult.exists})`);
-            console.log(`  📦 Result.info: ${!!panoramaResult.info}`);
-            
-            if (panoramaResult.info) {
-              console.log(`  📦 info.lon: ${panoramaResult.info.lon} (type: ${typeof panoramaResult.info.lon})`);
-              console.log(`  📦 info.lat: ${panoramaResult.info.lat} (type: ${typeof panoramaResult.info.lat})`);
-              console.log(`  📦 info.date: ${panoramaResult.info.date} (type: ${typeof panoramaResult.info.date})`);
-              
-              // Validate coordinate types
-              if (typeof panoramaResult.info.lon !== 'number' || typeof panoramaResult.info.lat !== 'number') {
-                console.error(`❌ Invalid coordinate types! lon: ${typeof panoramaResult.info.lon}, lat: ${typeof panoramaResult.info.lat}`);
-                continue;
-              }
-              
-              // Validate coordinate ranges
-              if (panoramaResult.info.lon < -180 || panoramaResult.info.lon > 180 || 
-                  panoramaResult.info.lat < -90 || panoramaResult.info.lat > 90) {
-                console.error(`❌ Invalid coordinate ranges! lon: ${panoramaResult.info.lon}, lat: ${panoramaResult.info.lat}`);
-                continue;
-              }
-            }
-          }
-          
-          if (panoramaResult && panoramaResult.exists === true && panoramaResult.info) {
-            // DŮLEŽITÉ: Dvojitá kontrola, že panorama je uvnitř polygonu
-            const isInsidePolygon = pointInPolygon([panoramaResult.info.lon, panoramaResult.info.lat], polygonCoords);
-            
-            if (!isInsidePolygon) {
-              console.log(`⚠️ Panorama at [${panoramaResult.info.lat}, ${panoramaResult.info.lon}] is OUTSIDE polygon, skipping`);
+
+          // 🚀 OPTIMIZED: Quick validation without verbose logging
+          if (!panoramaResult?.exists || !panoramaResult.info) continue;
+
+          const { lon, lat } = panoramaResult.info;
+          if (typeof lon !== 'number' || typeof lat !== 'number' ||
+              lon < -180 || lon > 180 || lat < -90 || lat > 90) continue;
+
+          // Process valid panorama
+          if (panoramaResult.exists && panoramaResult.info) {
+            // Quick polygon check
+            if (!pointInPolygon([panoramaResult.info.lon, panoramaResult.info.lat], polygonCoords)) {
               continue;
             }
-            
-            foundCount++;
-            console.log(`🎉 FOUND panorama ${foundCount} INSIDE polygon at [${panoramaResult.info.lat}, ${panoramaResult.info.lon}]`);
-            
-            // Enhanced deduplication with smaller tolerance for better accuracy
+
+            // Quick deduplication
             const key = `${panoramaResult.info.lat.toFixed(6)}_${panoramaResult.info.lon.toFixed(6)}`;
-            if (seen.has(key)) {
-              console.log(`⏭️ Skipping duplicate panorama at ${key}`);
-              continue;
-            }
+            if (seen.has(key)) continue;
             seen.add(key);
+
+            foundCount++;
             
-            // Additional spatial deduplication - check if point is too close to existing ones
-            const isTooClose = panoramaResult.info
-              ? foundPanoramas.some(existing => {
-                  const dLon = panoramaResult.info!.lon - existing.lon;
-                  const dLat = panoramaResult.info!.lat - existing.lat;
-                  const distance = Math.sqrt(dLon * dLon + dLat * dLat);
-                  return distance < 0.0001; // ~10 meters tolerance
-                })
-              : false;
-            
-            if (isTooClose) {
-              console.log(`⏭️ Skipping panorama too close to existing one at [${panoramaResult.info.lat.toFixed(6)}, ${panoramaResult.info.lon.toFixed(6)}]`);
-              continue;
-            }
+            // Quick spatial deduplication
+            const isTooClose = foundPanoramas.some(existing => {
+              const dLon = panoramaResult.info!.lon - existing.lon;
+              const dLat = panoramaResult.info!.lat - existing.lat;
+              return (dLon * dLon + dLat * dLat) < 0.00000001; // ~10 meters
+            });
+            if (isTooClose) continue;
             
             foundPanoramas.push({
               lon: panoramaResult.info.lon,
               lat: panoramaResult.info.lat,
               info: panoramaResult.info
             });
-            
-            // Spusť AI analýzu pro skutečný panorama bod
-            console.log(`🤖 Starting AI analysis for panorama ${foundCount}...`);
+
+            // 🚀 Quick AI analysis
             const analysis = await analyzePropertyCondition(`panorama-${foundCount}`, [panoramaResult.info.lon, panoramaResult.info.lat]);
-            
-            // 🔄 DETAILED COORDINATE TRANSFORMATION DEBUG
+
+            // Add to map
             const originalCoords = [panoramaResult.info.lon, panoramaResult.info.lat];
             const projectedCoords = fromLonLat(originalCoords);
-            console.log(`🔄 Feature Creation Debug for panorama ${foundCount}:`);
-            console.log(`  📍 Original coords: [${originalCoords[1].toFixed(6)}, ${originalCoords[0].toFixed(6)}] (lat,lon)`);
-            console.log(`  📍 Projected coords: [${projectedCoords[0].toFixed(2)}, ${projectedCoords[1].toFixed(2)}]`);
-            
-            // Vytvoř panorama bod s analýzou
+
             const panoramaFeature = new Feature({
               geometry: new Point(projectedCoords),
               name: `Panorama ${foundCount}`,
@@ -1098,38 +1064,8 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
               analysis,
               panoramaInfo: panoramaResult.info
             });
-            
-            // 🔍 FEATURE DEBUG BEFORE ADDING
-            console.log(`🔴 Feature Debug Before Adding:`);
-            console.log(`  📌 Geometry type: ${panoramaFeature.getGeometry()?.getType()}`);
-            console.log(`  📌 Geometry coords: ${panoramaFeature.getGeometry()?.getCoordinates()}`);
-            console.log(`  📌 Feature properties:`, panoramaFeature.getProperties());
-            
-            // Přidej na mapu
-            console.log(`📋 Layer state before adding feature:`);
-            console.log(`  📋 Source exists: ${!!source}`);
-            console.log(`  📋 Features count before: ${source.getFeatures().length}`);
-            console.log(`  📋 Layer visible: ${panoramaLayer?.getVisible()}`);
-            console.log(`  📋 Layer z-index: ${panoramaLayer?.getZIndex()}`);
-            
+
             source.addFeature(panoramaFeature);
-            
-            console.log(`📋 Layer state after adding feature:`);
-            console.log(`  📋 Features count after: ${source.getFeatures().length}`);
-            console.log(`✅ ADDED real panorama ${foundCount} to map source`);
-            
-            // 🔄 IMMEDIATE VERIFICATION
-            const addedFeatures = source.getFeatures();
-            const lastFeature = addedFeatures[addedFeatures.length - 1];
-            if (lastFeature) {
-              console.log(`✅ VERIFICATION: Last feature in source:`);
-              console.log(`  📏 Name: ${lastFeature.get('name')}`);
-              console.log(`  📏 Coords: [${lastFeature.get('coordinates')[1]}, ${lastFeature.get('coordinates')[0]}]`);
-              const geometry = lastFeature.getGeometry() as Point;
-              if (geometry) {
-                console.log(`  📏 Geometry: ${geometry.getCoordinates()}`);
-              }
-            }
             
             // Přidej do výsledků
             newResults.push({
