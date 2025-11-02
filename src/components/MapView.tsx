@@ -15,6 +15,7 @@ import CircleStyle from 'ol/style/Circle.js';
 import Feature from 'ol/Feature.js';
 import { Point, Polygon } from 'ol/geom';
 import { toLonLat, fromLonLat } from 'ol/proj';
+import PanoramaApiService from './PanoramaApiService';
 
 // TypeScript deklarace pro Mapy.cz REST API odpověď
 
@@ -65,6 +66,8 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
   const [showPanoramaGallery, setShowPanoramaGallery] = useState(false);
   const [panoramaWithDates, setPanoramaWithDates] = useState<{lon: number, lat: number, date: string}[]>([]);
   const globalPanoLayerRef = useRef<VectorLayer<VectorSource> | null>(null);
+  const [selectedForAnalysis, setSelectedForAnalysis] = useState<Set<number>>(new Set());
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
   
   // Critical error logging
   const [jsErrors, setJsErrors] = useState<string[]>([]);
@@ -1110,6 +1113,7 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
       setPanoramaLocations(allPanoramaLocations);
       setPanoramaWithDates(allPanoramaWithDates);
       setAnalysisResults(newResults);
+      setSelectedForAnalysis(new Set()); // Reset selection after new search
 
       // Show analysis panel if we have results
       if (newResults.length > 0) {
@@ -1207,6 +1211,91 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
       console.log('🏁 findPanoramas function completed');
     }
   }
+
+  const handleToggleAnalysisSelection = (id: number) => {
+    setSelectedForAnalysis(prev => {
+      const newSelection = new Set(prev);
+      if (newSelection.has(id)) {
+        newSelection.delete(id);
+      } else {
+        newSelection.add(id);
+      }
+      return newSelection;
+    });
+  };
+
+  const handleRunAiAnalysis = async () => {
+    if (selectedForAnalysis.size === 0) {
+      alert('Vyberte prosím alespoň jednu nemovitost k analýze.');
+      return;
+    }
+
+    setIsAiAnalyzing(true);
+    const selectedResults = analysisResults.filter(r => selectedForAnalysis.has(r.id));
+
+    const panoramaApiService = new PanoramaApiService(process.env.REACT_APP_MAPY_API_KEY || '');
+
+    for (const result of selectedResults) {
+      try {
+        // Fetch the panorama image as a blob URL
+        const panoImageResponse = await panoramaApiService.fetchPanoramaImage(
+          result.coordinates[0],
+          result.coordinates[1]
+        );
+
+        if (!panoImageResponse.success || !panoImageResponse.imageUrl) {
+          throw new Error('Nepodařilo se načíst obrázek pro analýzu.');
+        }
+
+        const blob = await fetch(panoImageResponse.imageUrl).then(r => r.blob());
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        const response = await fetch('/api/analyze-property', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl: dataUrl,
+            coordinates: result.coordinates
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'AI analýza selhala.');
+        }
+
+        const aiResult = await response.json();
+        
+        // Update the specific result in the main analysisResults state
+        setAnalysisResults(prevResults =>
+          prevResults.map(prevResult =>
+            prevResult.id === result.id
+              ? { ...prevResult, aiAnalysis: aiResult }
+              : prevResult
+          )
+        );
+
+      } catch (error) {
+        console.error(`Chyba při analýze nemovitosti ${result.id}:`, error);
+        // Optionally update the result with an error message
+        setAnalysisResults(prevResults =>
+          prevResults.map(prevResult =>
+            prevResult.id === result.id
+              ? { ...prevResult, aiAnalysis: { error: (error as Error).message } }
+              : prevResult
+          )
+        );
+      }
+    }
+
+    setIsAiAnalyzing(false);
+    alert(`AI analýza dokončena pro ${selectedResults.length} nemovitostí.`);
+  };
 
   // COMPREHENSIVE API VALIDATION TEST
   const testApiConnection = async () => {
@@ -1889,6 +1978,16 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
                 </span>
               </button>
             )}
+            {selectedForAnalysis.size > 0 && (
+                <button
+                    onClick={handleRunAiAnalysis}
+                    className="w-full px-4 py-3 font-bold transition-all duration-300 flex items-center gap-3 text-left bg-green-600 text-white hover:bg-green-500"
+                    disabled={isAiAnalyzing}
+                >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    <span>{isAiAnalyzing ? 'Analyzuji...' : `Spustit AI Analýzu (${selectedForAnalysis.size})`}</span>
+                </button>
+            )}
         </div>
         
         {/* Status Panel */}
@@ -1940,6 +2039,8 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
             <AnalysisPanel 
               results={analysisResults} 
               onExport={handleExport}
+              selectedIds={selectedForAnalysis}
+              onToggleSelection={handleToggleAnalysisSelection}
             />
           )}
 

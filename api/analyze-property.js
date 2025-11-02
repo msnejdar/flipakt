@@ -51,28 +51,39 @@ export default async function handler(req, res) {
             {
               type: 'image',
               source: {
-                type: 'url',
-                url: imageUrl
+                type: 'base64',
+                media_type: 'image/jpeg',
+                data: imageUrl.split(',')[1],
               }
             },
             {
               type: 'text',
-              text: `Analyze this property image for real estate acquisition potential. Focus on:
-1. Overall condition (excellent, good, fair, poor, neglected)
-2. Visible maintenance issues
-3. Signs of vacancy or disrepair
-4. Renovation needs
-5. Acquisition potential score (0-100)
+              text: `Jsi expert na analýzu nemovitostí pro realitní investory. Analyzuj obrázek nemovitosti a posuď její potenciál pro akvizici. Zaměř se na známky zanedbání. Vrať odpověď POUZE ve formátu JSON, bez jakéhokoliv dalšího textu, s následující strukturou a hodnocením v ČEŠTINĚ.
 
-Provide analysis in JSON format with these fields:
-- condition: string
-- confidence: number (0-1)
-- issues: string[]
-- recommendation: string
-- acquisitionScore: number (0-100)
-- estimatedRenovationCost: number (CZK)
+Checklist pro posouzení (hodnoť na stupnici 0-10, kde 10 je nejhorší stav):
+- stav_fasady (praskliny, opadávající omítka, špína, plíseň)
+- stav_oken_dveri (rozbitá okna, poškozené rámy, staré dveře)
+- stav_strechy (chybějící tašky, poškození, provizorní opravy)
+- okoli_nemovitosti (zanedbaný pozemek, nepořádek, poškozený plot)
+- celkovy_dojem (celková zanedbanost v porovnání s okolím)
 
-Coordinates: ${coordinates[0]}, ${coordinates[1]}`
+Výstupní JSON struktura:
+{
+  "checklist": {
+    "stav_fasady": number,
+    "stav_oken_dveri": number,
+    "stav_strechy": number,
+    "okoli_nemovitosti": number,
+    "celkovy_dojem": number
+  },
+  "souhrn": {
+    "pozitiva": string[],
+    "negativa": string[],
+    "doporuceni": string,
+    "potencial_prodeje_skore": number // 0-100
+  },
+  "stari_a_styl": string
+}`
             }
           ]
         }]
