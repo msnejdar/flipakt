@@ -139,9 +139,9 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
         return null;
       }
 
-      // 🚀 Add timeout to fail fast (500ms instead of waiting forever)
+      // 🚀 Add timeout to fail fast (300ms for instant results)
       const timeoutPromise = new Promise<null>((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout')), 500)
+        setTimeout(() => reject(new Error('Timeout')), 300)
       );
 
       const apiPromise = (window as any).Panorama.panoramaExists({ lon, lat, apiKey, radius });
@@ -984,32 +984,28 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
       // Test each point in the comprehensive grid for panorama existence
       console.log(`🔍 Starting comprehensive panorama search with ${gridPoints.length} test points...`);
 
-      // 🚀 PERFORMANCE OPTIMIZATION: Parallel batch processing instead of sequential
-      const BATCH_SIZE = 50; // Process 50 points in parallel for maximum speed
+      // 🚀 ULTRA-FAST: Process ALL points simultaneously - no batching!
       const searchRadius = 25;
 
-      for (let batchStart = 0; batchStart < gridPoints.length; batchStart += BATCH_SIZE) {
-        const batchEnd = Math.min(batchStart + BATCH_SIZE, gridPoints.length);
-        const batch = gridPoints.slice(batchStart, batchEnd);
+      console.log(`🚀 Processing ALL ${gridPoints.length} points at once...`);
+      setAnalysisProgress(40);
 
-        console.log(`🔍 Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(gridPoints.length / BATCH_SIZE)} (points ${batchStart + 1}-${batchEnd})`);
+      // Fire all requests at once
+      const allResults = await Promise.allSettled(
+        gridPoints.map((point, idx) =>
+          checkPanoramaExists(point.lon, point.lat, API_KEY, searchRadius)
+            .then(result => ({ point, result, index: idx }))
+        )
+      );
 
-        // Process all points in batch in parallel
-        const batchResults = await Promise.allSettled(
-          batch.map((point, idx) =>
-            checkPanoramaExists(point.lon, point.lat, API_KEY, searchRadius)
-              .then(result => ({ point, result, index: batchStart + idx }))
-          )
-        );
+      console.log(`✅ All ${gridPoints.length} API calls completed!`);
+      setAnalysisProgress(70);
 
-        // Process results from the batch
-        for (const promiseResult of batchResults) {
-          if (promiseResult.status === 'rejected') {
-            console.warn('⚠️ Panorama check failed:', promiseResult.reason);
-            continue;
-          }
+      // Process all results
+      for (const promiseResult of allResults) {
+        if (promiseResult.status === 'rejected') continue;
 
-          const { point, result: panoramaResult, index: i } = promiseResult.value;
+        const { point, result: panoramaResult, index: i } = promiseResult.value;
 
           try {
 
@@ -1082,25 +1078,15 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
             
             // Aktualizuj state
             setPanoramaLocations(prev => [...prev, { lon: panoramaResult.info!.lon, lat: panoramaResult.info!.lat }]);
-            setPanoramaWithDates(prev => [...prev, { 
-              lon: panoramaResult.info!.lon, 
-              lat: panoramaResult.info!.lat, 
-              date: panoramaResult.info!.date 
+            setPanoramaWithDates(prev => [...prev, {
+              lon: panoramaResult.info!.lon,
+              lat: panoramaResult.info!.lat,
+              date: panoramaResult.info!.date
             }]);
-            
-          } else {
-            console.log(`❌ No panorama found at point ${i + 1}`);
           }
         } catch (error) {
-          console.error(`🔥 ERROR checking panorama at point ${i + 1}:`, error);
           // Continue with next point rather than failing completely
         }
-      }
-
-        // Enhanced progress update with panorama count after each batch
-        const progress = 30 + Math.round((batchEnd / gridPoints.length) * 60);
-        setAnalysisProgress(progress);
-        console.log(`📊 Progress: ${progress}% (${foundCount} panoramas found so far)`);
       }
       
       // Set all results at once
