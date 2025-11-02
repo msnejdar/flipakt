@@ -18,11 +18,13 @@ A modern landing page for PropertyScout AI - an AI-powered real estate acquisiti
    ```
 
 3. Set up environment variables:
-   - Update the `.env` file with your Mapy.cz API key:
+   - Create a `.env.local` file with your API keys:
    ```bash
-   REACT_APP_MAPY_API_KEY=your_actual_api_key_here
+   REACT_APP_MAPY_API_KEY=your_mapy_api_key_here
+   REACT_APP_ANTHROPIC_API_KEY=your_anthropic_api_key_here
    ```
-   - Get your API key from: https://developer.mapy.com/
+   - Get Mapy.cz API key from: https://developer.mapy.com/
+   - Get Anthropic API key from: https://console.anthropic.com/
 
 4. Start the development server:
    ```bash
@@ -56,6 +58,61 @@ Builds the app for production to the `build` folder
 
 ### `npm test`
 Launches the test runner in interactive watch mode
+
+## Deployment on Vercel
+
+### Quick Deploy
+
+1. Push your code to GitHub
+2. Go to [vercel.com](https://vercel.com)
+3. Click "Import Project"
+4. Select your GitHub repository
+5. Vercel will automatically detect the Create React App setup
+6. **IMPORTANT**: Add environment variables in Vercel dashboard (Settings → Environment Variables):
+
+   **Server-side only (secure):**
+   - `MAPY_API_KEY` = your_mapy_api_key
+   - `ANTHROPIC_API_KEY` = your_anthropic_api_key
+
+   **Optional - for development fallback:**
+   - `REACT_APP_MAPY_API_KEY` = your_mapy_api_key
+
+   See [VERCEL_DEPLOYMENT.md](VERCEL_DEPLOYMENT.md) for detailed instructions.
+
+7. Click "Deploy"
+
+### Manual Deploy with Vercel CLI
+
+```bash
+# Install Vercel CLI
+npm i -g vercel
+
+# Login to Vercel
+vercel login
+
+# Deploy
+vercel
+```
+
+The project includes a `vercel.json` configuration file that handles:
+- Build command: `npm run build`
+- Output directory: `build`
+- API routes for serverless functions (`/api/*`)
+- SPA routing with proper rewrites
+
+### Serverless API Endpoints
+
+The app uses Vercel Serverless Functions to keep API keys secure:
+
+- **POST `/api/analyze-property`** - Claude AI property analysis
+  - Body: `{ imageUrl: string, coordinates: [number, number] }`
+  - Returns: Property condition analysis with AI insights
+
+- **POST `/api/panorama-search`** - Mapy.cz panorama search
+  - Body: `{ lat: number, lon: number, radius?: number }`
+  - Returns: Nearby panorama locations
+
+These endpoints keep your API keys server-side and secure.
 
 ## Note
 
