@@ -1805,29 +1805,29 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-dark-bg z-50">
+    <div className="fixed inset-0 bg-dark-bg z-50 flex text-white">
       {/* Loading Overlay */}
       {(isLoading || isAnalyzing) && (
-        <div className="absolute inset-0 bg-dark-bg/90 flex items-center justify-center z-10">
-          <div className="text-center bg-dark-card/90 backdrop-blur-sm border border-electric-blue/20 rounded-xl p-8">
+        <div className="absolute inset-0 bg-dark-bg/90 flex items-center justify-center z-50">
+          <div className="text-center bg-dark-card/90 backdrop-blur-sm border border-electric-blue/20 p-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-electric-blue mb-4 mx-auto"></div>
             <div className="text-white text-lg mb-2">
-              {isLoading ? 'Loading map...' : 'Searching for panorama locations...'}
+              {isLoading ? 'Načítání mapy...' : 'Vyhledávání panorama lokací...'}
             </div>
             {isAnalyzing && (
               <div className="text-center">
                 <div className="text-electric-blue text-sm mb-2">
-                  Checking area: {analysisProgress}%
+                  Prohledávám oblast: {analysisProgress}%
                 </div>
-                <div className="w-64 bg-gray-700 rounded-full h-2">
+                <div className="w-64 bg-gray-700 h-2">
                   <div 
-                    className="bg-gradient-to-r from-electric-blue to-deep-purple h-2 rounded-full transition-all duration-300"
+                    className="bg-gradient-to-r from-electric-blue to-deep-purple h-2 transition-all duration-300"
                     style={{ width: `${analysisProgress}%` }}
                   ></div>
                 </div>
                 {panoramaLocations.length > 0 && (
                   <div className="text-green-400 text-sm mt-2">
-                    Analyzed {analysisResults.length} properties
+                    Nalezeno {analysisResults.length} panoramat
                   </div>
                 )}
               </div>
@@ -1836,249 +1836,116 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
         </div>
       )}
 
-      {/* Back Button */}
-      <button
-        onClick={onBack}
-        className="absolute top-6 left-6 z-20 bg-dark-card/80 backdrop-blur-sm border border-electric-blue/20 hover:border-electric-blue/50 text-white px-4 py-2 rounded-lg transition-all duration-300 flex items-center gap-2"
-      >
-        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Back to Home
-      </button>
-
-      {/* Comprehensive Debug Status Panel */}
-      <div className="absolute top-6 right-6 z-20 bg-dark-card/90 backdrop-blur-sm border border-electric-blue/20 rounded-lg p-3 text-white text-sm max-w-xs">
-        <div className="font-bold text-electric-blue mb-2">🔍 System Status</div>
-        <div className="space-y-1 text-xs">
-          <div>Panorama Points: <span className="text-green-400">{panoramaLocations.length}</span></div>
-          <div>Layer Features: <span className="text-blue-400">{panoramaLayer?.getSource()?.getFeatures().length || 0}</span></div>
-          <div>Layer Visible: <span className={panoramaLayer?.getVisible() ? "text-green-400" : "text-red-400"}>{panoramaLayer?.getVisible() ? "Yes" : "No"}</span></div>
-          <div>Layer Z-Index: <span className="text-yellow-400">{panoramaLayer?.getZIndex() || 'N/A'}</span></div>
-          <div>Polygon: <span className={hasPolygon ? "text-green-400" : "text-gray-400"}>{hasPolygon ? "Drawn" : "None"}</span></div>
-          <div>API Key: <span className={process.env.REACT_APP_MAPY_API_KEY ? "text-green-400" : "text-red-400"}>{process.env.REACT_APP_MAPY_API_KEY ? "Available" : "Missing"}</span></div>
-          <div>Map Layers: <span className="text-blue-400">{mapInstanceRef.current?.getLayers().getLength() || 0}</span></div>
-          <div>JS Errors: <span className={jsErrors.length === 0 ? "text-green-400" : "text-red-400"}>{jsErrors.length}</span></div>
+      {/* Left Sidebar */}
+      <aside className="w-72 bg-dark-card border-r border-gray-800 flex flex-col z-20 p-4 space-y-4">
+        <div className="flex-shrink-0">
+          <h1 className="text-2xl font-bold text-white">Flip<span className="text-electric-blue">akt</span></h1>
+          <p className="text-xs text-gray-400">Property Analysis Tool</p>
         </div>
-        
-        {/* Feature count indicator */}
-        {panoramaLayer && panoramaLayer.getSource() && panoramaLayer.getSource()!.getFeatures().length > 0 && (
-          <div className="mt-2 p-1 bg-green-900/30 rounded text-xs">
-            ✅ {panoramaLayer.getSource()!.getFeatures().length} features loaded
-          </div>
-        )}
-        
-        {/* JavaScript errors section */}
-        {jsErrors.length > 0 && (
-          <div className="mt-2 p-1 bg-red-900/30 rounded text-xs">
-            <div className="text-red-400 font-semibold">⚠️ JS Errors ({jsErrors.length}):</div>
-            <div className="max-h-16 overflow-y-auto mt-1 space-y-1">
-              {jsErrors.slice(-3).map((error, index) => (
-                <div key={index} className="text-red-300 break-all">{error.substring(0, 50)}...</div>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {/* Layer in map verification */}
-        {panoramaLayer && mapInstanceRef.current && (
-          <div className="mt-2 p-1 bg-blue-900/30 rounded text-xs">
-            <div className="text-blue-400">Layer Status:</div>
-            <div className={mapInstanceRef.current.getLayers().getArray().includes(panoramaLayer) ? "text-green-400" : "text-red-400"}>
-              {mapInstanceRef.current.getLayers().getArray().includes(panoramaLayer) ? "✅ In Map" : "❌ Not in Map"}
-            </div>
-          </div>
-        )}
-      </div>
 
-      {/* Map Container */}
-      <div
-        ref={mapRef}
-        className="w-full h-full z-0"
-        style={{ height: '100vh', width: '100%' }}
-      />
-
-      {/* Floating Toolbar */}
-      {!isLoading && !error && (
-        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-          <div className="bg-dark-card/90 backdrop-blur-sm border border-electric-blue/20 rounded-xl p-4 shadow-lg">
-            <div className="flex items-center gap-4">
-              {/* Draw Area Button */}
-              <button
+        {/* Controls */}
+        <div className="flex-grow flex flex-col space-y-2">
+            <button
                 onClick={handleDrawArea}
-                className={`px-6 py-3 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 ${
+                className={`w-full px-4 py-3 font-medium transition-all duration-300 flex items-center gap-3 text-left ${
                   isDrawingMode
                     ? 'bg-electric-blue text-white'
-                    : 'bg-electric-blue/20 text-electric-blue hover:bg-electric-blue/30'
+                    : 'bg-gray-800 text-gray-200 hover:bg-gray-700'
                 }`}
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
                 </svg>
-                {isDrawingMode ? 'Drawing...' : 'Draw Area'}
-              </button>
-
-              {/* Load Panoramas Button */}
-              <button
+                <span>{isDrawingMode ? 'Kreslení...' : 'Vymezit oblast'}</span>
+            </button>
+             <button
                 onClick={loadPanoramasInView}
-                className="px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 bg-purple-600 text-white hover:bg-purple-500"
+                className="w-full px-4 py-3 font-medium transition-all duration-300 flex items-center gap-3 text-left bg-gray-800 text-gray-200 hover:bg-gray-700"
               >
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
                 </svg>
-                📷 Show Panoramas
-              </button>
-
-              {/* API Test Button */}
+                <span>Načíst panoramata</span>
+            </button>
+            
+            {panoramaLocations.length > 0 && (
               <button
-                onClick={testApiConnection}
-                className="px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 bg-orange-600 text-white hover:bg-orange-500 border-2 border-orange-400"
+                onClick={() => setShowPanoramaGallery(true)}
+                className="w-full px-4 py-3 font-medium transition-all duration-300 flex items-center gap-3 text-left bg-gray-800 text-gray-200 hover:bg-gray-700"
+                disabled={panoramaWithDates.length === 0}
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0" />
-                </svg>
-                🔗 API Test
+                <span>🏞️</span>
+                <span>Zobrazit snímky</span>
+                <span className="ml-auto bg-electric-blue/20 text-electric-blue px-2 py-0.5 text-xs font-bold">
+                  {panoramaLocations.length}
+                </span>
               </button>
-              
-              {/* Layer Diagnostic Button */}
-              <button
-                onClick={diagnosePanoramaLayer}
-                className="px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 bg-purple-600 text-white hover:bg-purple-500 border-2 border-purple-400"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                🔬 Diagnose
-              </button>
-
-              {/* Prague Test Button */}
-              <button
-                onClick={testKnownPragueLocations}
-                className="px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 bg-blue-600 text-white hover:bg-blue-500"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                </svg>
-                🏰 Prague
-              </button>
-              
-              {/* Critical Debug Test Button */}
-              <button
-                onClick={debugTestDirectPanoramaPoints}
-                className="px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 bg-red-600 text-white hover:bg-red-500 border-2 border-red-400"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-                🔍 DEBUG TEST
-              </button>
-              
-              {/* Test Bot Button */}
-              <button
-                onClick={handleTestBot}
-                className="px-4 py-2 rounded-lg font-medium transition-all duration-300 flex items-center gap-2 bg-green-600 text-white hover:bg-green-500"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                </svg>
-                🤖 Mock Test
-              </button>
-
-              {/* Status Info */}
-              <div className="text-gray-300 text-sm text-center ml-4">
-                {panoramaLocations.length > 0 ? (
-                  <div className="flex flex-col items-center">
-                    <div className="text-green-400 font-medium">
-                      Analyzed {analysisResults.length} properties
-                    </div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      {analysisResults.filter(r => r.condition === 'neglected').length} potential acquisitions found
-                    </div>
-                    <div className="text-xs text-electric-blue mt-1">
-                      {panoramaLocations.length} panorama{panoramaLocations.length !== 1 ? 's' : ''} available
-                    </div>
-                    <button
-                      onClick={() => setShowPanoramaGallery(true)}
-                      className="mt-2 px-4 py-1.5 bg-electric-blue hover:bg-electric-blue/80 text-white text-sm rounded-lg transition-colors flex items-center space-x-2"
-                      disabled={panoramaWithDates.length === 0}
-                    >
-                      <span>🏞️</span>
-                      <span>View Images</span>
-                      <span className="bg-white/20 px-2 py-0.5 rounded-full text-xs">
-                        {panoramaLocations.length}
-                      </span>
-                    </button>
-                  </div>
-                ) : hasPolygon ? (
-                  isAnalyzing ? (
-                    <div>
-                      <div className="text-electric-blue">🔍 Comprehensive Polygon Search</div>
-                      <div className="text-xs text-gray-400 mt-1">{analysisProgress}% complete</div>
-                      <div className="text-xs text-green-400 mt-1">Testing entire polygon area with adaptive density grid</div>
-                      <div className="text-xs text-blue-400 mt-1">All panorama points inside polygon will be found</div>
-                    </div>
-                  ) : (
-                    <div>
-                      <div className="text-yellow-400">Polygon drawn</div>
-                      <div className="text-xs text-gray-400 mt-1">Comprehensive search will find ALL panoramas inside</div>
-                      <div className="text-xs text-blue-400 mt-1">No more grid limitations - complete coverage</div>
-                    </div>
-                  )
-                ) : isDrawingMode ? (
-                  <div>
-                    <div className="text-electric-blue">Click to add polygon points</div>
-                    <div className="text-xs text-electric-blue mt-1">
-                      Click first point again to finish • Double-click to finish • Press Esc to cancel
-                    </div>
-                  </div>
-                ) : (
-                  <div>
-                    <div className="text-gray-400">Draw a polygon to find ALL panorama locations</div>
-                    <div className="text-xs text-gray-500 mt-1">Comprehensive search covers entire polygon area</div>
-                    <div className="text-xs text-blue-400 mt-1">No grid limitations - finds every panorama inside</div>
-                  </div>
-                )}
-              </div>
-            </div>
+            )}
+        </div>
+        
+        {/* Status Panel */}
+        <div className="flex-shrink-0 bg-gray-900 border border-gray-800 p-3 text-xs">
+          <div className="font-bold text-gray-300 mb-2">Stav systému</div>
+          <div className="space-y-1">
+              <div>Panorama bodů: <span className="font-mono text-green-400 float-right">{panoramaLocations.length}</span></div>
+              <div>Polygon: <span className={`font-mono float-right ${hasPolygon ? "text-green-400" : "text-gray-500"}`}>{hasPolygon ? "Vymezen" : "Není"}</span></div>
+              <div>API Klíč: <span className={`font-mono float-right ${process.env.REACT_APP_MAPY_API_KEY ? "text-green-400" : "text-red-400"}`}>{process.env.REACT_APP_MAPY_API_KEY ? "Dostupný" : "Chybí"}</span></div>
+              <div>JS Chyby: <span className={`font-mono float-right ${jsErrors.length === 0 ? "text-green-400" : "text-red-400"}`}>{jsErrors.length}</span></div>
           </div>
         </div>
-      )}
 
-      {/* Analysis Panel */}
-      {showAnalysisPanel && (
-        <AnalysisPanel 
-          results={analysisResults} 
-          onExport={handleExport}
-        />
-      )}
-
-      {/* Panorama Gallery */}
-      {showPanoramaGallery && (
-        <div className="fixed inset-0 z-50 bg-dark-bg">
-          <PanoramaGallery 
-            locations={panoramaWithDates}
-            apiKey={process.env.REACT_APP_MAPY_API_KEY || ''}
-            onClose={() => setShowPanoramaGallery(false)}
-          />
+        <div className="flex-shrink-0">
+          <button
+            onClick={onBack}
+            className="w-full text-left bg-gray-800 hover:bg-gray-700 text-gray-200 px-4 py-3 transition-colors duration-300 flex items-center gap-3"
+          >
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+            Zpět na domovskou stránku
+          </button>
         </div>
-      )}
+      </aside>
 
-      {/* Panorama Demo - temporary for testing */}
-      <div className="absolute top-20 right-4 z-10">
-        <PanoramaDemo />
-      </div>
+      {/* Main Content */}
+      <main className="flex-1 relative">
+          {/* Map Container */}
+          <div
+            ref={mapRef}
+            className="w-full h-full"
+          />
 
-      {/* Analysis Panel Toggle Button */}
-      {analysisResults.length > 0 && (
-        <button
-          onClick={() => setShowAnalysisPanel(!showAnalysisPanel)}
-          className="fixed right-6 bottom-6 z-20 bg-electric-blue hover:bg-electric-blue/80 text-white p-3 rounded-full shadow-lg transition-all duration-300"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-          </svg>
-        </button>
-      )}
+          {/* Analysis Panel Toggle Button */}
+          {analysisResults.length > 0 && (
+            <button
+              onClick={() => setShowAnalysisPanel(!showAnalysisPanel)}
+              className="absolute top-4 right-4 z-20 bg-dark-card hover:bg-gray-800 border border-gray-700 text-white p-3 shadow-lg transition-all duration-300"
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </button>
+          )}
+
+          {/* Analysis Panel */}
+          {showAnalysisPanel && (
+            <AnalysisPanel 
+              results={analysisResults} 
+              onExport={handleExport}
+            />
+          )}
+
+          {/* Panorama Gallery */}
+          {showPanoramaGallery && (
+            <div className="absolute inset-0 z-50 bg-dark-bg">
+              <PanoramaGallery 
+                locations={panoramaWithDates}
+                apiKey={process.env.REACT_APP_MAPY_API_KEY || ''}
+                onClose={() => setShowPanoramaGallery(false)}
+              />
+            </div>
+          )}
+      </main>
     </div>
   );
 };
