@@ -1656,7 +1656,7 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
   // Funkce pro načtení panoramatických bodů v aktuálním výhledu mapy
   const loadPanoramasInView = async () => {
     if (!mapInstanceRef.current || !panoramaLayer) return;
-    
+
     const map = mapInstanceRef.current;
     const panoSource = panoramaLayer.getSource();
     if (!panoSource) return;
@@ -1667,93 +1667,77 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
     const API_KEY = process.env.REACT_APP_MAPY_API_KEY;
     if (!API_KEY) return;
 
+    // Use a unified grid generation and processing logic
+    let gridPoints: { lon: number; lat: number }[] = [];
+    let searchRadius = 50; // Default for viewport
+
     if (polygonGeom) {
       const [w, s] = toLonLat([polygonGeom.getExtent()[0], polygonGeom.getExtent()[1]]);
       const [e, n] = toLonLat([polygonGeom.getExtent()[2], polygonGeom.getExtent()[3]]);
       const polygonCoords = polygonToCoords(polygonGeom);
-      const gridPoints = generateComprehensivePointsInPolygon(polygonCoords, w, s, e, n, 15, 3000);
+      gridPoints = generateComprehensivePointsInPolygon(polygonCoords, w, s, e, n, 15, 3000);
+      searchRadius = 25; // Smaller radius for dense grid
       console.log(`🌍 Loading panoramas INSIDE polygon with ${gridPoints.length} grid points (15m spacing)`);
-
-      let foundCount = 0;
-      for (let i = 0; i < gridPoints.length; i++) {
-        const { lon, lat } = gridPoints[i];
-        try {
-          const panoramaResult = await checkPanoramaExists(lon, lat, API_KEY, 25);
-          if (panoramaResult && panoramaResult.exists && panoramaResult.info) {
-            const key = `${panoramaResult.info.lat.toFixed(6)}_${panoramaResult.info.lon.toFixed(6)}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            foundCount++;
-            const feature = new Feature({
-              geometry: new Point(fromLonLat([panoramaResult.info.lon, panoramaResult.info.lat])),
-              name: `Panorama Point ${foundCount}`,
-              coordinates: [panoramaResult.info.lon, panoramaResult.info.lat],
-              date: panoramaResult.info.date || 'Unknown',
-              type: 'view-panorama'
-            });
-            panoSource.addFeature(feature);
-          }
-          await rateLimiter();
-        } catch {}
-      }
-
-      forceRenderPanoramaLayer();
-      return;
-    }
-
-    // Fallback: no polygon -> viewport grid
-    const view = map.getView();
-    const extent = view.calculateExtent(map.getSize());
-    const [w, s] = toLonLat([extent[0], extent[1]]);
-    const [e, n] = toLonLat([extent[2], extent[3]]);
-    console.log(`🌍 Loading panoramas in current view: W=${w.toFixed(4)} S=${s.toFixed(4)} E=${e.toFixed(4)} N=${n.toFixed(4)}`);
-    
-    // Vytvoř menší grid pro rychlejší načítání
-    const gridSize = 6; // 6x6 = 36 bodů
-    const stepX = (e - w) / gridSize;
-    const stepY = (n - s) / gridSize;
-    
-    console.log(`📍 Testing ${gridSize}x${gridSize} grid for panoramas...`);
-    
-    let foundCount = 0;
-    
-    for (let i = 0; i < gridSize; i++) {
-      for (let j = 0; j < gridSize; j++) {
-        const lon = w + (i + 0.5) * stepX;
-        const lat = s + (j + 0.5) * stepY;
-        
-        try {
-          const panoramaResult = await checkPanoramaExists(lon, lat, API_KEY, 50);
-          
-          if (panoramaResult && panoramaResult.exists && panoramaResult.info) {
-            // Zkontroluj deduplikaci
-            const key = `${panoramaResult.info.lat.toFixed(5)}_${panoramaResult.info.lon.toFixed(5)}`;
-            if (seen.has(key)) continue;
-            seen.add(key);
-            
-            foundCount++;
-            console.log(`📍 Found panorama ${foundCount}: [${panoramaResult.info.lat.toFixed(5)}, ${panoramaResult.info.lon.toFixed(5)}]`);
-            
-            // Vytvoř panorama bod
-            const panoramaFeature = new Feature({
-              geometry: new Point(fromLonLat([panoramaResult.info.lon, panoramaResult.info.lat])),
-              name: `Panorama Point ${foundCount}`,
-              coordinates: [panoramaResult.info.lon, panoramaResult.info.lat],
-              date: panoramaResult.info.date || 'Unknown',
-              type: 'view-panorama',
-              panoramaInfo: panoramaResult.info
-            });
-            
-            panoSource.addFeature(panoramaFeature);
-          }
-          
-          // Rate limiting
-          await new Promise(resolve => setTimeout(resolve, 100));
-          
-        } catch (error) {
-          console.error('Error checking panorama:', error);
+    } else {
+      // Fallback: no polygon -> viewport grid
+      const view = map.getView();
+      const extent = view.calculateExtent(map.getSize());
+      const [w, s] = toLonLat([extent[0], extent[1]]);
+      const [e, n] = toLonLat([extent[2], extent[3]]);
+      console.log(`🌍 Loading panoramas in current view: W=${w.toFixed(4)} S=${s.toFixed(4)} E=${e.toFixed(4)} N=${n.toFixed(4)}`);
+      
+      // Vytvoř menší grid pro rychlejší načítání
+      const gridSize = 10; // 10x10 = 100 bodů, hustší pro lepší pokrytí
+      const stepX = (e - w) / gridSize;
+      const stepY = (n - s) / gridSize;
+      
+      for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+          const lon = w + (i + 0.5) * stepX;
+          const lat = s + (j + 0.5) * stepY;
+          gridPoints.push({ lon, lat });
         }
       }
+      console.log(`📍 Testing ${gridPoints.length} grid points for panoramas...`);
+    }
+
+    if (gridPoints.length === 0) return;
+
+    // Fire all requests at once
+    const allPanoramaPromises = gridPoints.map(point => 
+      checkPanoramaExists(point.lon, point.lat, API_KEY, searchRadius)
+    );
+
+    const results = await Promise.allSettled(allPanoramaPromises);
+
+    let foundCount = 0;
+    const newFeatures: Feature[] = [];
+
+    results.forEach(promiseResult => {
+      if (promiseResult.status === 'fulfilled' && promiseResult.value) {
+        const panoramaResult = promiseResult.value;
+        if (panoramaResult.exists && panoramaResult.info) {
+          const key = `${panoramaResult.info.lat.toFixed(6)}_${panoramaResult.info.lon.toFixed(6)}`;
+          if (seen.has(key)) return;
+          seen.add(key);
+          
+          foundCount++;
+          
+          const feature = new Feature({
+            geometry: new Point(fromLonLat([panoramaResult.info.lon, panoramaResult.info.lat])),
+            name: `Panorama Point ${foundCount}`,
+            coordinates: [panoramaResult.info.lon, panoramaResult.info.lat],
+            date: panoramaResult.info.date || 'Unknown',
+            type: 'view-panorama',
+            panoramaInfo: panoramaResult.info
+          });
+          newFeatures.push(feature);
+        }
+      }
+    });
+
+    if (newFeatures.length > 0) {
+      panoSource.addFeatures(newFeatures); // Batch add all features
     }
     
     console.log(`✅ Loaded ${foundCount} panorama points in current view`);
