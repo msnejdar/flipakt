@@ -2139,8 +2139,6 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
             <AnalysisPanel 
               results={analysisResults} 
               onExport={handleExport}
-              selectedIds={selectedForAnalysis}
-              onToggleSelection={handleToggleAnalysisSelection}
             />
           )}
 
