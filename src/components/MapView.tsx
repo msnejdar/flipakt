@@ -1001,14 +1001,14 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
     // Vyčisti vše
     source.clear();
     seen.clear();
+    setPanoramaLocations([]);
+    setPanoramaWithDates([]);
+    setAnalysisResults([]);
     console.log('✅ Cleared previous panorama points');
     
     setIsAnalyzing(true);
     setAnalysisProgress(10);
-    setPanoramaLocations([]);
-    setPanoramaWithDates([]);
-    console.log('✅ Set analyzing state to true');
-
+    
     try {
       // Získej hranice polygonu a převeď na souřadnice
       const extent = poly.getExtent();
