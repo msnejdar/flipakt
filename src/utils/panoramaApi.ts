@@ -18,22 +18,26 @@ export class PanoramaApiService {
     // IMPORTANT: Max dimensions are 1024x1024 pixels!
     // yaw: 0–2π radians (or "auto"/"point")
     // pitch: ±π radians
-    // fov: π/2 to π/20 radians
+    // fov: π/2 to π/20 radians (API is VERY strict about these limits!)
 
     const width = Math.min(options.width || 1024, 1024); // Max 1024px!
     const height = Math.min(options.height || 800, 1024); // Max 1024px!
 
     // Convert degrees to radians for yaw (0-360° → 0-2π)
-    const yawDegrees = options.yaw || 0;
+    const yawDegrees = options.yaw !== undefined ? options.yaw : 0;
     const yawRadians = (yawDegrees * Math.PI) / 180;
 
     // Convert degrees to radians for pitch (-90 to 90° → -π to π)
-    const pitchDegrees = options.pitch || 0;
+    const pitchDegrees = options.pitch !== undefined ? options.pitch : 0;
     const pitchRadians = (pitchDegrees * Math.PI) / 180;
 
-    // Convert FOV degrees to radians (90° → ~1.57 rad)
+    // Convert FOV degrees to radians
+    // CRITICAL: API rejects values >= Math.PI/2, so we cap at 1.57 (just under π/2)
     const fovDegrees = options.fov || 90;
     const fovRadians = (fovDegrees * Math.PI) / 180;
+    const minFov = Math.PI / 20; // ~0.157 radians (9°)
+    const maxFov = 1.57; // Safely under π/2 (1.5708), API strictly rejects >= π/2
+    const safeFov = Math.min(Math.max(fovRadians, minFov), maxFov);
 
     const params = new URLSearchParams({
       lon: lon.toString(),
@@ -42,7 +46,7 @@ export class PanoramaApiService {
       height: height.toString(),
       yaw: yawRadians.toFixed(4),
       pitch: pitchRadians.toFixed(4),
-      fov: fovRadians.toFixed(4),
+      fov: safeFov.toFixed(4),
       apikey: this.apiKey
     });
 
