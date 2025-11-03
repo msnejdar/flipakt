@@ -14,6 +14,7 @@ export class PanoramaApiService {
     lat: number,
     options: Partial<PanoramaControlsState> = {}
   ): string {
+    // Mapy.cz Static Panorama API format
     const params = new URLSearchParams({
       lon: lon.toString(),
       lat: lat.toString(),
@@ -22,7 +23,7 @@ export class PanoramaApiService {
       yaw: (options.yaw || 0).toString(),
       pitch: (options.pitch || 0).toString(),
       fov: (options.fov || 90).toString(),
-      apiKey: this.apiKey
+      apikey: this.apiKey // lowercase 'apikey'!
     });
 
     return `${this.baseUrl}?${params.toString()}`;
