@@ -271,10 +271,9 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({
               onChange={(e) => handleControlChange('width', parseInt(e.target.value))}
               className="w-full bg-dark-card text-white border border-electric-blue/20 rounded px-2 py-1 text-sm"
             >
+              <option value={640}>640px</option>
               <option value={800}>800px</option>
-              <option value={1200}>1200px</option>
-              <option value={1600}>1600px</option>
-              <option value={1920}>1920px</option>
+              <option value={1024}>1024px (max)</option>
             </select>
           </div>
 
@@ -286,9 +285,10 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({
               onChange={(e) => handleControlChange('height', parseInt(e.target.value))}
               className="w-full bg-dark-card text-white border border-electric-blue/20 rounded px-2 py-1 text-sm"
             >
+              <option value={480}>480px</option>
               <option value={600}>600px</option>
               <option value={800}>800px</option>
-              <option value={1080}>1080px</option>
+              <option value={1024}>1024px (max)</option>
             </select>
           </div>
         </div>

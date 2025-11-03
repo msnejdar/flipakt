@@ -15,15 +15,35 @@ export class PanoramaApiService {
     options: Partial<PanoramaControlsState> = {}
   ): string {
     // Mapy.cz Static Panorama API format
+    // IMPORTANT: Max dimensions are 1024x1024 pixels!
+    // yaw: 0–2π radians (or "auto"/"point")
+    // pitch: ±π radians
+    // fov: π/2 to π/20 radians
+
+    const width = Math.min(options.width || 1024, 1024); // Max 1024px!
+    const height = Math.min(options.height || 800, 1024); // Max 1024px!
+
+    // Convert degrees to radians for yaw (0-360° → 0-2π)
+    const yawDegrees = options.yaw || 0;
+    const yawRadians = (yawDegrees * Math.PI) / 180;
+
+    // Convert degrees to radians for pitch (-90 to 90° → -π to π)
+    const pitchDegrees = options.pitch || 0;
+    const pitchRadians = (pitchDegrees * Math.PI) / 180;
+
+    // Convert FOV degrees to radians (90° → ~1.57 rad)
+    const fovDegrees = options.fov || 90;
+    const fovRadians = (fovDegrees * Math.PI) / 180;
+
     const params = new URLSearchParams({
       lon: lon.toString(),
       lat: lat.toString(),
-      width: (options.width || 1200).toString(),
-      height: (options.height || 800).toString(),
-      yaw: (options.yaw || 0).toString(),
-      pitch: (options.pitch || 0).toString(),
-      fov: (options.fov || 90).toString(),
-      apikey: this.apiKey // lowercase 'apikey'!
+      width: width.toString(),
+      height: height.toString(),
+      yaw: yawRadians.toFixed(4),
+      pitch: pitchRadians.toFixed(4),
+      fov: fovRadians.toFixed(4),
+      apikey: this.apiKey
     });
 
     return `${this.baseUrl}?${params.toString()}`;

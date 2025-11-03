@@ -66,10 +66,10 @@ export const PANORAMA_DEFAULTS: PanoramaViewerSettings = {
   defaultYaw: 0,
   defaultPitch: 0,
   defaultFov: 90,
-  defaultWidth: 1200,
+  defaultWidth: 1024, // Mapy.cz API max is 1024px!
   defaultHeight: 800,
-  maxWidth: 1920,
-  maxHeight: 1080,
+  maxWidth: 1024, // Mapy.cz API max is 1024px!
+  maxHeight: 1024, // Mapy.cz API max is 1024px!
   minFov: 10,
   maxFov: 120,
   downloadFormats: ['jpg', 'png']
