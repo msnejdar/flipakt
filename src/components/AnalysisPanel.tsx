@@ -10,16 +10,15 @@ interface AnalysisResult {
   recommendation: string;
   estimatedValue: number;
   aiAnalysis?: any; // To store AI analysis results or errors
+  analysisStatus: 'pending' | 'analyzing' | 'completed' | 'failed';
 }
 
 interface AnalysisPanelProps {
   results: AnalysisResult[];
   onExport: (format: 'csv' | 'json') => void;
-  selectedIds: Set<number>;
-  onToggleSelection: (id: number) => void;
 }
 
-const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ results, onExport, selectedIds, onToggleSelection }) => {
+const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ results, onExport }) => {
   const [expandedResults, setExpandedResults] = useState<Set<number>>(new Set());
   const [sortBy, setSortBy] = useState<'confidence' | 'value' | 'name'>('confidence');
 
@@ -119,43 +118,29 @@ const AnalysisPanel: React.FC<AnalysisPanelProps> = ({ results, onExport, select
                 onClick={() => toggleExpanded(result.id)}
               >
                 <div className="flex items-start justify-between">
-                    <div className="flex items-start space-x-3 flex-1">
-                      <input
-                        type="checkbox"
-                        className="mt-1 h-4 w-4 bg-gray-700 border-gray-600 text-electric-blue focus:ring-electric-blue"
-                        checked={selectedIds.has(result.id)}
-                        onChange={(e) => {
-                          e.stopPropagation();
-                          onToggleSelection(result.id);
-                        }}
-                      />
-                      <div className="flex-1">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3">
+                        {result.analysisStatus === 'analyzing' && (
+                          <div className="w-4 h-4 border-2 border-blue-400/20 border-t-blue-400 rounded-full animate-spin"></div>
+                        )}
+                        {result.analysisStatus === 'completed' && (
+                          <div className="w-4 h-4 text-green-400">✓</div>
+                        )}
+                         {result.analysisStatus === 'failed' && (
+                          <div className="w-4 h-4 text-red-400">✗</div>
+                        )}
                         <h4 className="font-semibold text-white mb-1">{result.name}</h4>
-                        <div className="text-xs text-gray-500 mb-2 font-mono">
-                          [{result.coordinates[1].toFixed(4)}, {result.coordinates[0].toFixed(4)}]
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <span
-                            className={`px-2 py-0.5 text-xs font-medium ${
-                              result.condition === 'neglected'
-                                ? 'bg-red-500/20 text-red-400'
-                                : result.condition === 'good'
-                                ? 'bg-green-500/20 text-green-400'
-                                : 'bg-yellow-500/20 text-yellow-400'
-                            }`}
-                          >
-                            {result.condition}
-                          </span>
-                          <span className="text-sm text-gray-400 font-mono">
-                            {(result.confidence * 100).toFixed(0)}%
-                          </span>
-                        </div>
+                      </div>
+                      <div className="text-xs text-gray-500 mt-1 mb-2 font-mono pl-7">
+                        [{result.coordinates[1].toFixed(4)}, {result.coordinates[0].toFixed(4)}]
                       </div>
                     </div>
                   <div className="text-right">
-                    <div className="text-white font-semibold font-mono">
-                      {(result.estimatedValue / 1000).toFixed(0)}k CZK
-                    </div>
+                    {result.analysisStatus === 'completed' && result.aiAnalysis && (
+                       <div className="text-yellow-400 font-bold text-lg font-mono">
+                         {result.aiAnalysis.souhrn.potencial_prodeje_skore} / 100
+                       </div>
+                    )}
                     <svg
                       className={`w-5 h-5 text-gray-400 mt-1 transition-transform ${
                         expandedResults.has(result.id) ? 'rotate-180' : ''

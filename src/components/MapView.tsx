@@ -72,6 +72,71 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
   // Critical error logging
   const [jsErrors, setJsErrors] = useState<string[]>([]);
 
+  const runBatchAiAnalysis = async (resultsToAnalyze: any[]) => {
+    const panoramaApiService = new PanoramaApiService(process.env.REACT_APP_MAPY_API_KEY || '');
+
+    for (const result of resultsToAnalyze) {
+      setAnalysisResults(prevResults =>
+        prevResults.map(prevResult =>
+          prevResult.id === result.id ? { ...prevResult, analysisStatus: 'analyzing' } : prevResult
+        )
+      );
+
+      try {
+        const panoImageResponse = await panoramaApiService.fetchPanoramaImage(
+          result.coordinates[0],
+          result.coordinates[1]
+        );
+
+        if (!panoImageResponse.success || !panoImageResponse.imageUrl) {
+          throw new Error('Nepodařilo se načíst obrázek pro analýzu.');
+        }
+
+        const blob = await fetch(panoImageResponse.imageUrl).then(r => r.blob());
+        const reader = new FileReader();
+        const dataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+
+        const response = await fetch('/api/analyze-property', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            imageUrl: dataUrl,
+            coordinates: result.coordinates
+          })
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'AI analýza selhala.');
+        }
+
+        const aiResult = await response.json();
+        
+        setAnalysisResults(prevResults =>
+          prevResults.map(prevResult =>
+            prevResult.id === result.id
+              ? { ...prevResult, aiAnalysis: aiResult, analysisStatus: 'completed' }
+              : prevResult
+          )
+        );
+
+      } catch (error) {
+        console.error(`Chyba při analýze nemovitosti ${result.id}:`, error);
+        setAnalysisResults(prevResults =>
+          prevResults.map(prevResult =>
+            prevResult.id === result.id
+              ? { ...prevResult, aiAnalysis: { error: (error as Error).message }, analysisStatus: 'failed' }
+              : prevResult
+          )
+        );
+      }
+    }
+  };
+
   // Claude AI analysis function
   const analyzePropertyCondition = async (imageUrl: string, coordinates: [number, number]) => {
     // Mock analysis for now - replace with actual Claude API call
@@ -1086,7 +1151,8 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
               issues: mockAnalysis.issues,
               recommendation: mockAnalysis.recommendation,
               estimatedValue: mockAnalysis.estimatedValue,
-              panoramaDate: panoramaResult.info.date
+              panoramaDate: panoramaResult.info.date,
+              analysisStatus: 'pending'
             });
 
             // 🚀 Collect for batch state update at the end
@@ -1113,7 +1179,9 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
       setPanoramaLocations(allPanoramaLocations);
       setPanoramaWithDates(allPanoramaWithDates);
       setAnalysisResults(newResults);
-      setSelectedForAnalysis(new Set()); // Reset selection after new search
+
+      // Spustíme AI analýzu na pozadí pro všechny nové výsledky
+      runBatchAiAnalysis(newResults);
 
       // Show analysis panel if we have results
       if (newResults.length > 0) {
@@ -1842,9 +1910,10 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
             condition: 'pending',
             confidence: 0,
             issues: ['Čeká na AI analýzu'],
-            recommendation: 'Spusťte AI analýzu pro doporučení.',
+            recommendation: 'AI analýza bude spuštěna automaticky.',
             estimatedValue: 0,
-            panoramaDate: panoramaResult.info.date
+            panoramaDate: panoramaResult.info.date,
+            analysisStatus: 'pending'
           });
 
           newPanoramaLocations.push({ lon: panoramaResult.info.lon, lat: panoramaResult.info.lat });
@@ -1864,6 +1933,9 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
     setPanoramaLocations(newPanoramaLocations);
     setPanoramaWithDates(newPanoramaWithDates);
     setAnalysisResults(newResults);
+    
+    // Spustíme AI analýzu na pozadí pro všechny nové výsledky
+    runBatchAiAnalysis(newResults);
     
     console.log(`✅ Loaded ${foundCount} panorama points in current view`);
     
