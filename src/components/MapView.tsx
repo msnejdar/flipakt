@@ -1181,7 +1181,7 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
       setAnalysisResults(newResults);
 
       // Spustíme AI analýzu na pozadí pro všechny nové výsledky
-      runBatchAiAnalysis(newResults);
+      // runBatchAiAnalysis(newResults);
 
       // Show analysis panel if we have results
       if (newResults.length > 0) {
@@ -1935,7 +1935,7 @@ const MapView: React.FC<MapViewProps> = ({ onBack }) => {
     setAnalysisResults(newResults);
     
     // Spustíme AI analýzu na pozadí pro všechny nové výsledky
-    runBatchAiAnalysis(newResults);
+    // runBatchAiAnalysis(newResults);
     
     console.log(`✅ Loaded ${foundCount} panorama points in current view`);
     
