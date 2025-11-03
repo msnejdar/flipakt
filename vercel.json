@@ -4,11 +4,12 @@
   "devCommand": "npm start",
   "installCommand": "npm install",
   "framework": "create-react-app",
+  "functions": {
+    "api/**/*.js": {
+      "runtime": "nodejs20.x"
+    }
+  },
   "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    },
     {
       "source": "/(.*)",
       "destination": "/index.html"
