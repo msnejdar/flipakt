@@ -26,10 +26,19 @@ export default async function handler(req, res) {
 
   const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY;
 
+  // Enhanced debugging
+  console.log('[DEBUG] Environment variables check:');
+  console.log('[DEBUG] ANTHROPIC_API_KEY exists:', !!ANTHROPIC_API_KEY);
+  console.log('[DEBUG] ANTHROPIC_API_KEY length:', ANTHROPIC_API_KEY ? ANTHROPIC_API_KEY.length : 0);
+  console.log('[DEBUG] Available env vars:', Object.keys(process.env).filter(k => k.includes('ANTHROPIC') || k.includes('API')));
+
   if (!ANTHROPIC_API_KEY) {
-    console.error('ANTHROPIC_API_KEY not configured');
+    console.error('[ERROR] ANTHROPIC_API_KEY not configured');
     return res.status(500).json({
-      error: 'API key not configured'
+      error: 'API key not configured',
+      debug: {
+        availableEnvVars: Object.keys(process.env).filter(k => k.includes('ANTHROPIC') || k.includes('API'))
+      }
     });
   }
 
