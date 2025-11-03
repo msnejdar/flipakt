@@ -25,7 +25,7 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({
     pitch: PANORAMA_DEFAULTS.defaultPitch,
     fov: PANORAMA_DEFAULTS.defaultFov,
     width: PANORAMA_DEFAULTS.defaultWidth,
-    height: PANORAMA_DEFAULTS.defaultHeight
+    height: 800
   });
 
   const [imageState, setImageState] = useState({
@@ -36,6 +36,8 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({
   });
 
   const [isDownloading, setIsDownloading] = useState(false);
+  const [aiAnalysis, setAiAnalysis] = useState<any | null>(null);
+  const [isAiAnalyzing, setIsAiAnalyzing] = useState(false);
   
   // Refs
   const panoramaApiRef = useRef<PanoramaApiService | null>(null);
@@ -101,6 +103,50 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({
   }, [controls, updateImage]);
 
 
+  const handleRunAiAnalysis = async () => {
+    if (!imageState.url) {
+      alert('Nejprve je třeba načíst obrázek panoramatu.');
+      return;
+    }
+
+    setIsAiAnalyzing(true);
+    setAiAnalysis(null);
+
+    try {
+      const blob = await fetch(imageState.url).then(r => r.blob());
+      const reader = new FileReader();
+      const dataUrl = await new Promise<string>((resolve, reject) => {
+        reader.onloadend = () => resolve(reader.result as string);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      const response = await fetch('/api/analyze-property', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          imageUrl: dataUrl,
+          coordinates: [lon, lat]
+        })
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'AI analýza selhala.');
+      }
+
+      const result = await response.json();
+      setAiAnalysis(result);
+
+    } catch (error) {
+      console.error(`Chyba při AI analýze:`, error);
+      setAiAnalysis({ error: (error as Error).message });
+    } finally {
+      setIsAiAnalyzing(false);
+    }
+  };
+
+
   // Control handlers
   const handleControlChange = (key: keyof PanoramaControlsState, value: number) => {
     setControls(prev => ({
@@ -115,7 +161,7 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({
       pitch: PANORAMA_DEFAULTS.defaultPitch,
       fov: PANORAMA_DEFAULTS.defaultFov,
       width: PANORAMA_DEFAULTS.defaultWidth,
-      height: PANORAMA_DEFAULTS.defaultHeight
+      height: 800
     });
   };
 
@@ -187,22 +233,22 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({
   }, [controls, onClose]);
 
   return (
-    <div className={`panorama-viewer bg-dark-bg text-white ${className}`}>
+    <div className={`panorama-viewer bg-dark-bg text-white flex flex-col h-full ${className}`}>
       {/* Header */}
-      <div className="flex items-center justify-between p-4 border-b border-electric-blue/20">
+      <div className="flex-shrink-0 flex items-center justify-between p-4 border-b border-gray-800">
         <div className="flex items-center space-x-4">
-          <h3 className="text-xl font-bold text-electric-blue">Panorama Viewer</h3>
-          <div className="text-sm text-gray-300">
+          <h3 className="text-xl font-bold text-white">Detail snímku</h3>
+          <div className="text-sm text-gray-400 font-mono">
             <span>📍 {lat.toFixed(6)}, {lon.toFixed(6)}</span>
-            <span className="ml-4">📅 {date}</span>
+            <span className="ml-4">📅 {new Date(date).toLocaleDateString()}</span>
           </div>
         </div>
         
         {onClose && (
           <button
             onClick={onClose}
-            className="p-2 hover:bg-dark-card/50 rounded-lg transition-colors"
-            title="Close (Esc)"
+            className="p-2 hover:bg-gray-800"
+            title="Zavřít (Esc)"
           >
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -211,168 +257,134 @@ const PanoramaViewer: React.FC<PanoramaViewerProps> = ({
         )}
       </div>
 
-      {/* Controls Panel */}
-      <div className="p-4 border-b border-electric-blue/20 bg-dark-card/30">
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-          {/* Yaw Control */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Yaw (°) <span className="text-gray-400">[← →]</span>
-            </label>
-            <input
-              type="range"
-              min="0"
-              max="360"
-              step="1"
-              value={controls.yaw}
-              onChange={(e) => handleControlChange('yaw', parseInt(e.target.value))}
-              className="w-full accent-electric-blue"
-            />
-            <div className="text-xs text-center mt-1 text-gray-300">{controls.yaw}°</div>
-          </div>
-
-          {/* Pitch Control */}
-          <div>
-            <label className="block text-sm font-medium mb-1">
-              Pitch (°) <span className="text-gray-400">[↑ ↓]</span>
-            </label>
-            <input
-              type="range"
-              min="-90"
-              max="90"
-              step="1"
-              value={controls.pitch}
-              onChange={(e) => handleControlChange('pitch', parseInt(e.target.value))}
-              className="w-full accent-electric-blue"
-            />
-            <div className="text-xs text-center mt-1 text-gray-300">{controls.pitch}°</div>
-          </div>
-
-          {/* FOV Control */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Field of View</label>
-            <input
-              type="range"
-              min={PANORAMA_DEFAULTS.minFov}
-              max={PANORAMA_DEFAULTS.maxFov}
-              step="1"
-              value={controls.fov}
-              onChange={(e) => handleControlChange('fov', parseInt(e.target.value))}
-              className="w-full accent-electric-blue"
-            />
-            <div className="text-xs text-center mt-1 text-gray-300">{controls.fov}°</div>
-          </div>
-
-          {/* Width Control */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Width</label>
-            <select
-              value={controls.width}
-              onChange={(e) => handleControlChange('width', parseInt(e.target.value))}
-              className="w-full bg-dark-card text-white border border-electric-blue/20 rounded px-2 py-1 text-sm"
-            >
-              <option value={640}>640px</option>
-              <option value={800}>800px</option>
-              <option value={1024}>1024px (max)</option>
-            </select>
-          </div>
-
-          {/* Height Control */}
-          <div>
-            <label className="block text-sm font-medium mb-1">Height</label>
-            <select
-              value={controls.height}
-              onChange={(e) => handleControlChange('height', parseInt(e.target.value))}
-              className="w-full bg-dark-card text-white border border-electric-blue/20 rounded px-2 py-1 text-sm"
-            >
-              <option value={480}>480px</option>
-              <option value={600}>600px</option>
-              <option value={800}>800px</option>
-              <option value={1024}>1024px (max)</option>
-            </select>
-          </div>
+      {/* Main Content */}
+      <div className="flex-1 flex overflow-hidden">
+        {/* Image Display */}
+        <div className="flex-1 flex items-center justify-center p-4 bg-gray-900/50">
+          {imageState.loading ? (
+            <div className="text-center">
+              <div className="w-12 h-12 border-4 border-electric-blue/20 border-t-electric-blue rounded-full animate-spin mx-auto mb-4"></div>
+              <p className="text-gray-300">Načítám panorama...</p>
+            </div>
+          ) : imageState.error ? (
+            <div className="text-center text-red-400">
+              <div className="text-6xl mb-4">⚠️</div>
+              <p className="text-lg mb-2">Nepodařilo se načíst panorama</p>
+              <p className="text-sm text-gray-400 font-mono">{imageState.error}</p>
+              <button
+                onClick={updateImage}
+                className="mt-4 px-4 py-2 bg-electric-blue hover:bg-electric-blue/80 transition-colors"
+              >
+                Opakovat
+              </button>
+            </div>
+          ) : imageState.url ? (
+            <div className="w-full h-full flex items-center justify-center">
+              <img
+                src={imageState.url}
+                alt={`Panorama at ${lat.toFixed(6)}, ${lon.toFixed(6)}`}
+                className="max-w-full max-h-full object-contain"
+              />
+            </div>
+          ) : null}
         </div>
 
-        {/* Action Buttons */}
-        <div className="flex items-center justify-between mt-4">
-          <div className="flex space-x-2">
-            <button
-              onClick={resetControls}
-              className="px-3 py-1 bg-dark-card hover:bg-electric-blue/20 border border-electric-blue/20 rounded-lg text-sm transition-colors"
-              title="Reset controls (R)"
-            >
-              🔄 Reset
-            </button>
-            
-            <button
-              onClick={handleDownload}
-              disabled={isDownloading || imageState.loading}
-              className="px-3 py-1 bg-electric-blue hover:bg-electric-blue/80 disabled:opacity-50 disabled:cursor-not-allowed rounded-lg text-sm transition-colors flex items-center space-x-1"
-              title="Download image (Ctrl+D)"
-            >
-              {isDownloading ? (
-                <>
-                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin"></div>
-                  <span>Downloading...</span>
-                </>
-              ) : (
-                <>
-                  <span>💾</span>
-                  <span>Download</span>
-                </>
-              )}
-            </button>
+        {/* Right Sidebar */}
+        <aside className="w-96 bg-dark-card border-l border-gray-800 p-4 flex flex-col space-y-4 overflow-y-auto">
+          {/* Controls Panel */}
+          <div>
+            <h4 className="text-lg font-bold text-white mb-3">Ovládání pohledu</h4>
+            <div className="space-y-3 text-sm">
+              {/* Yaw, Pitch, FOV */}
+              <div>
+                <label className="block font-medium mb-1">Yaw (°) <span className="text-gray-400 font-mono">[← →]</span></label>
+                <input type="range" min="0" max="360" step="1" value={controls.yaw} onChange={(e) => handleControlChange('yaw', parseInt(e.target.value))} className="w-full accent-electric-blue"/>
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Pitch (°) <span className="text-gray-400 font-mono">[↑ ↓]</span></label>
+                <input type="range" min="-90" max="90" step="1" value={controls.pitch} onChange={(e) => handleControlChange('pitch', parseInt(e.target.value))} className="w-full accent-electric-blue"/>
+              </div>
+              <div>
+                <label className="block font-medium mb-1">Zorné pole (FOV)</label>
+                <input type="range" min={PANORAMA_DEFAULTS.minFov} max={PANORAMA_DEFAULTS.maxFov} step="1" value={controls.fov} onChange={(e) => handleControlChange('fov', parseInt(e.target.value))} className="w-full accent-electric-blue"/>
+              </div>
+              {/* Width & Height */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-medium mb-1">Šířka</label>
+                  <select value={controls.width} onChange={(e) => handleControlChange('width', parseInt(e.target.value))} className="w-full bg-gray-800 border border-gray-700 px-2 py-1 text-white text-sm focus:border-electric-blue outline-none appearance-none">
+                    <option value={640}>640px</option>
+                    <option value={800}>800px</option>
+                    <option value={1024}>1024px (max)</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block font-medium mb-1">Výška</label>
+                  <select value={controls.height} onChange={(e) => handleControlChange('height', parseInt(e.target.value))} className="w-full bg-gray-800 border border-gray-700 px-2 py-1 text-white text-sm focus:border-electric-blue outline-none appearance-none">
+                    <option value={480}>480px</option>
+                    <option value={600}>600px</option>
+                    <option value={800}>800px</option>
+                    <option value={1024}>1024px (max)</option>
+                  </select>
+                </div>
+              </div>
+              {/* Actions */}
+              <div className="flex space-x-2 pt-2">
+                <button onClick={resetControls} className="flex-1 px-3 py-2 bg-gray-800 hover:bg-gray-700 border border-gray-700 text-sm transition-colors" title="Reset (R)">Reset</button>
+                <button onClick={handleDownload} disabled={isDownloading || imageState.loading} className="flex-1 px-3 py-2 bg-electric-blue hover:bg-electric-blue/80 disabled:opacity-50 text-sm transition-colors" title="Download (Ctrl+D)">Stáhnout</button>
+              </div>
+            </div>
           </div>
 
-          <div className="text-xs text-gray-400">
-            Use arrow keys to navigate • R to reset • Ctrl+D to download • Esc to close
-          </div>
-        </div>
-      </div>
+          <div className="border-t border-gray-800"></div>
 
-      {/* Image Display */}
-      <div className="flex-1 flex items-center justify-center p-4 bg-gray-900">
-        {imageState.loading ? (
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-electric-blue/20 border-t-electric-blue rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-gray-300">Loading panorama...</p>
-          </div>
-        ) : imageState.error ? (
-          <div className="text-center text-red-400">
-            <div className="text-6xl mb-4">⚠️</div>
-            <p className="text-lg mb-2">Failed to load panorama</p>
-            <p className="text-sm text-gray-400">{imageState.error}</p>
+          {/* AI Analysis Panel */}
+          <div>
+            <h4 className="text-lg font-bold text-white mb-3">AI Analýza</h4>
             <button
-              onClick={updateImage}
-              className="mt-4 px-4 py-2 bg-electric-blue hover:bg-electric-blue/80 rounded-lg transition-colors"
+              onClick={handleRunAiAnalysis}
+              disabled={isAiAnalyzing || imageState.loading || !!imageState.error}
+              className="w-full px-4 py-3 font-bold transition-all duration-300 flex items-center justify-center gap-3 text-left bg-green-600 text-white hover:bg-green-500 disabled:bg-gray-600"
             >
-              Retry
+              {isAiAnalyzing 
+                ? 'Analyzuji...' 
+                : (aiAnalysis ? 'Spustit analýzu znovu' : 'Spustit AI Analýzu')}
             </button>
-          </div>
-        ) : imageState.url ? (
-          <div className="max-w-full max-h-full overflow-hidden rounded-lg shadow-2xl">
-            <img
-              src={imageState.url}
-              alt={`Panorama at ${lat.toFixed(6)}, ${lon.toFixed(6)}`}
-              className="max-w-full max-h-full object-contain"
-              style={{
-                maxWidth: '100%',
-                maxHeight: '70vh'
-              }}
-            />
-          </div>
-        ) : null}
-      </div>
+            {isAiAnalyzing && <div className="text-center text-sm text-gray-400 mt-2">Analýza může trvat několik sekund...</div>}
 
-      {/* Footer Info */}
-      <div className="p-2 border-t border-electric-blue/20 bg-dark-card/20 text-xs text-gray-400 flex justify-between">
-        <span>
-          Resolution: {controls.width}x{controls.height} | 
-          View: {controls.yaw}°/{controls.pitch}°/{controls.fov}°
-        </span>
-        <span>
-          Last updated: {imageState.lastUpdate ? new Date(imageState.lastUpdate).toLocaleTimeString() : 'Never'}
-        </span>
+            {aiAnalysis && (
+              <div className="mt-4 space-y-3 text-xs bg-gray-900 border border-gray-800 p-3">
+                {aiAnalysis.error ? (
+                  <div className="text-red-400">Chyba: {aiAnalysis.error}</div>
+                ) : (
+                  <>
+                    <div>
+                      <h5 className="font-semibold text-gray-300 mb-1">Stáří a styl</h5>
+                      <p className="text-gray-400">{aiAnalysis.stari_a_styl}</p>
+                    </div>
+                    <div>
+                      <h5 className="font-semibold text-gray-300 mb-1">Checklist Zanedbání (0-10)</h5>
+                      <div className="grid grid-cols-2 gap-x-4 gap-y-1">
+                        {Object.entries(aiAnalysis.checklist).map(([key, value]) => (
+                          <div key={key} className="flex justify-between">
+                            <span className="text-gray-400 capitalize">{key.replace(/_/g, ' ')}:</span>
+                            <span className="font-mono text-white">{value as any}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                     <div>
+                      <h5 className="font-semibold text-gray-300 mb-1">Souhrn</h5>
+                      <p className="text-gray-400"><span className="text-red-400 font-semibold">Negativa:</span> {aiAnalysis.souhrn.negativa.join(', ')}</p>
+                      <p className="font-bold text-lg text-center mt-2 text-yellow-400">{aiAnalysis.souhrn.potencial_prodeje_skore} / 100</p>
+                      <p className="text-center text-xs text-gray-400">Skóre potenciálu prodeje</p>
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </aside>
       </div>
     </div>
   );
